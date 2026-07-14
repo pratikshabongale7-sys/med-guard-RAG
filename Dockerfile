@@ -12,7 +12,7 @@ COPY pyproject.toml uv.lock ./
 # installs exactly what is in pyproject with the frozen flag without dev deps
 RUN uv sync --frozen --no-dev
 
-# copies app code
+# copies app code after the above 2 commands because app code changes often and not deps - rebuilds are faster with cached deps
 COPY app ./app
 
 # Non-root user (HF Spaces requirement) - not a root (0-999) user

@@ -5,7 +5,12 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.139.0",
+    "fastembed>=0.8.0",
+    "httpx2>=2.5.0",
+    "langchain-text-splitters>=1.1.2",
     "pydantic-settings>=2.14.2",
+    "qdrant-client>=1.18.0",
+    "rank-bm25>=0.2.2",
     "uvicorn>=0.51.0",
 ]
 
