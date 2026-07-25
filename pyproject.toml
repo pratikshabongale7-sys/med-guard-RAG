@@ -21,6 +21,12 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.15.20",
 ]
+nli = [
+    "protobuf>=7.35.1",
+    "sentencepiece>=0.2.2",
+    "torch>=2.13.0",
+    "transformers>=5.14.1",
+]
 
 [tool.ruff.lint]
 ignore = ["E501"]  # line length

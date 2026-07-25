@@ -15,10 +15,12 @@ def get_client() -> OpenAI:
         _client = OpenAI(api_key=cfg["key"], base_url=cfg["base_url"])
     return _client
 
-# returns the answer and the usage per answer generation
-def generate(messages: list[dict], model: str) -> tuple[str, object]:
+# returns the answer and the usage per query (answer generation)
+def generate(messages: list[dict], model: str = settings.llm_model) -> tuple[str, object]:
+    # for i, m in enumerate(messages):
+    #     print(i, m["role"], type(m["content"]), repr(m["content"])[:120])
     response = get_client().chat.completions.create(
-        model=model or settings.llm_model,
+        model=model,
         messages=messages,
         temperature=settings.llm_temperature,
     )

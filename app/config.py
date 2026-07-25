@@ -39,5 +39,15 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     gemini_api_key: str = ""
 
+    # --- Reliability Guards ---
+    enable_guards: bool = True  # master switch - ablation runs with this False
+    max_retrieval_retries: int = 2
+
+    # --- Faithfulness verification ---
+    verifier: str = "llm_judge"  # llm_judge | nli_judge
+    nli_model: str = "cross-encoder/nli-deberta-v3-small"
+    faithfulness_threshold: float = 0.5  # per-claim: entailment score to count as supported
+    min_supported_ratio: float = 0.75  # answer only if >=75% of claims are supported
+
 
 settings = Settings()
