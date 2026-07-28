@@ -4,6 +4,8 @@ from app.config import settings
 
 _PROVIDERS = {
     "groq": {"base_url": "https://api.groq.com/openai/v1", "key": settings.groq_api_key},
+    "cerebras": {"base_url": "https://api.cerebras.ai/v1", "key": settings.cerebras_api_key},
+    "gemini": {"base_url": "https://generativelanguage.googleapis.com/v1beta/openai/", "key": settings.gemini_api_key},
 }
 
 _client: OpenAI | None = None # starts with None and then uses global reassigning later

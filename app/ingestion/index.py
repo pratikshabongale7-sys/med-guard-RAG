@@ -29,4 +29,15 @@ def index_chunks(client: QdrantClient, collection: str, chunks: list[dict], vect
     client.upsert(collection_name=collection, points=points)
     return len(points)
 
-
+# fetch chunks from Qdrant to be pushed to bm25 pickle so they stay consistent at all times
+def fetch_all_chunks(client: QdrantClient, collection: str) -> list[dict]:
+    chunks, offset = [], None
+    while True:
+        points, offset = client.scroll(
+            collection_name=collection, limit=256, offset=offset, # few round-trips, modest memory per page
+            with_payload=True, with_vectors=False,
+        )
+        chunks.extend(p.payload for p in points)
+        if offset is None:
+            break
+    return chunks

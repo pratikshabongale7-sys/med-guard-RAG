@@ -20,6 +20,6 @@ def rewrite_query(original: str, previous: str) -> str:
 
     text, _ = generate(messages, settings.llm_model)
     rewritten_query = (text or "").strip().strip('"')
-
+    print("Query rewrite LLM call")
     return rewritten_query or original # never return empty — fall back to the original
 

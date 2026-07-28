@@ -38,16 +38,29 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     openai_api_key: str = ""
     gemini_api_key: str = ""
+    cerebras_api_key: str = ""
 
     # --- Reliability Guards ---
     enable_guards: bool = True  # master switch - ablation runs with this False
     max_retrieval_retries: int = 2
 
     # --- Faithfulness verification ---
-    verifier: str = "llm_judge"  # llm_judge | nli_judge
+    verifier: str = ""  # llm_judge | nli_judge
     nli_model: str = "cross-encoder/nli-deberta-v3-small"
+    atomize_claims: bool = True
+    premise_top_k: int = 3  # evidence sentences pulled per claim
     faithfulness_threshold: float = 0.5  # per-claim: entailment score to count as supported
     min_supported_ratio: float = 0.75  # answer only if >=75% of claims are supported
+
+    # --- Ablation switches (all default to the "full system") ---
+    retrieval_mode: str = "hybrid"  # hybrid | vector | bm25
+    rerank_enabled: bool = True
+
+    # --- Eval ---
+    eval_dir: str = "eval"
+    eval_checkpoint_dir: str = "eval/checkpoints"
+    # guards still run and compute confidence, but never abstain with gate_active=false
+    gate_active: bool = True  # False = measure-only: compute guards but NEVER abstain (for risk-coverage)
 
 
 settings = Settings()

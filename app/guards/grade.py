@@ -27,6 +27,7 @@ def grade_evidence(question: str, evidence: str) -> str:
     ]
 
     text, _ = generate(messages, settings.llm_model)
+    print("Grade evidence LLM call")
     # parse the model output
     label = (text or "").strip().upper().strip(".")
     for valid_label in Label:

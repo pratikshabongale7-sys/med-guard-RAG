@@ -1,9 +1,10 @@
 from app.config import settings
+from app.guards.atomize import atomize
 from app.guards.claims import split_claims, cited_indices
 from app.guards.gate import evaluate_answer
 from app.guards.grade import grade_evidence
 from app.guards.rewrite import rewrite_query
-from app.guards.verify import verify_claim
+from app.guards.verify import verify_claim, to_sentences, _llm_judge, _similar_sentences, _BACKENDS
 from app.llm import generate
 from app.retrieval import retrieve
 
@@ -15,6 +16,7 @@ SYSTEM_PROMPT = (
     "not patient-facing medical advice."
 )
 
+
 def build_context(chunk: list[dict]) -> str:
     lines = []
     for i, c in enumerate(chunk, start=1):
@@ -23,40 +25,11 @@ def build_context(chunk: list[dict]) -> str:
 
     return "\n\n".join(lines)
 
-# old answer generator = retrieve->generate->return - no guards
-# def answer_query(query: str) -> dict:
-#     top_chunks = retrieve(query)
-#
-#     if not top_chunks:
-#         return {
-#             "answer": "No relevant evidence was found in the corpus for this question.",
-#             "citations": [],
-#             "evidence": {"count": 0, "items": []},
-#         }
-#
-#     full_prompt = [
-#         {"role": "system", "content": SYSTEM_PROMPT},
-#         {"role": "user", "content": f"Evidence:\n{build_context(top_chunks)}\n\nQuestion: {query}"},
-#     ]
-#
-#     text, usage = generate(full_prompt, settings.llm_model)
-#
-#     citations = [
-#         {"n": i, "title": chunk["payload"]["title"], "pmid": chunk["payload"]["pmid"], "url": chunk["payload"]["url"]}
-#         for i, chunk in enumerate(top_chunks, start=1)
-#     ]
-#
-#     return {
-#         "answer": text,
-#         "citations": citations,
-#         "usage": {"prompt_tokens": usage.prompt_tokens, "completion_tokens": usage.completion_tokens},
-#     }
-
-
 # new answer generator = grading + retries → generate → verify → gate
 REFUSAL = (
     "I can't answer this safely: the available evidence does not sufficiently support an answer to this question."
 )
+
 
 # refusal helper function
 def _abstain(reason: str, attempts: list[str], evidence_count: int = 0, **extra) -> dict:
@@ -74,7 +47,7 @@ def _abstain(reason: str, attempts: list[str], evidence_count: int = 0, **extra)
 
 def answer_query(query: str) -> dict:
     attempts: list[str] = []
-    current_query = query # current_query = possibly re-written query & query is the user's original query
+    current_query = query  # current_query = possibly re-written query & query is the user's original query
     chunks: list[dict] = []
     grade = "None"
 
@@ -82,10 +55,10 @@ def answer_query(query: str) -> dict:
     for attempt in range(settings.max_retrieval_retries + 1):
         attempts.append(current_query)
         chunks = retrieve(current_query)
-        print("CHUNKS:", [c["payload"]["title"][:60] for c in chunks])
+        # print("CHUNKS:", [c["payload"]["title"][:60] for c in chunks])
 
         if not settings.enable_guards:
-            break # returns the chunks retrieved above in just one attempt without any guarding
+            break  # returns the chunks retrieved above in just one attempt without any guarding
 
         # always grade against user's original query and not the current_query in case the retrieved evidence from the
         # current_query doesn't answer the user's original query = real abstention
@@ -97,9 +70,9 @@ def answer_query(query: str) -> dict:
 
     if not chunks:
         return _abstain("No evidence found", attempts)
-    if settings.enable_guards and grade != "SUFFICIENT":
-        return _abstain(f"evidence graded {grade} after {len(attempts)} attempt(s)",
-                        attempts, len(chunks))
+    # gate_active = False is to let the system NOT abstain - computes confidence, answers everything → data for AURC
+    if settings.enable_guards and settings.gate_active and grade != "SUFFICIENT":
+        return _abstain(f"evidence graded {grade} after {len(attempts)} attempt(s)", attempts, len(chunks))
 
     # successful exit of above for loop = retrieved chunks which is passed below
 
@@ -110,9 +83,11 @@ def answer_query(query: str) -> dict:
     ]
 
     draft, usage = generate(message)
+    print("Draft message LLM call")
 
     citations = [
-        {"n": i, "title": c["payload"]["title"], "pmid": c["payload"]["pmid"], "url": c["payload"]["url"]}
+        {"citation": i, "chunk-id": c["payload"]["id"], "title": c["payload"]["title"], "pmid": c["payload"]["pmid"],
+         "url": c["payload"]["url"]}
         for i, c in enumerate(chunks, start=1)
     ]
 
@@ -127,20 +102,39 @@ def answer_query(query: str) -> dict:
             "guards": "Disabled"
         }
 
-    # Guard 2: faithfulness check + gate
-    claims = split_claims(draft) # draft is what the LLM outputs after generating above
+    # Guard 2: faithfulness check (layer 3 and layer 4 - faithfulness + citation) + gate
+    sentences_all = to_sentences(chunks)  # faithfulness: all retrieved evidence
+    claims = atomize(draft) if settings.atomize_claims else split_claims(draft)  # draft is what the LLM outputs after generating above
     verdicts = []
 
     for claim in claims:
-        cited_ids = cited_indices(claim)
-        # verify against chunks this claim cites; if it cites none then check against all chunks
-        # the chunks are stored indexing from 1 and len(chunks) is to prevent model from hallucinating into checking for a chunk that was not retrieved
-        sources = [chunks[i-1] for i in cited_ids if 1 <= i <= len(chunks)] or chunks
-        verdicts.append(verify_claim(claim, [source["payload"]["text"] for source in sources]))
+        verdict = verify_claim(claim, sentences_all) # faithfulness vs ALL evidence
+        verdict["primary_supported"] = verdict["supported"] # pure NLI or LLM verdict before the following 2-tier rescue
+        #TODO: uncomment for 2-tier NLI+LLM verdict
+        # if not verdict["supported"] and settings.verifier != "llm_judge": # to not call llm again if llm_judge is used
+        #     # Faithfulness layer 3 (two-tier): low-scoring claims get an LLM-judge second opinion; flags multi-hop NLI misses.
+        #     top = _similar_sentences(claim, sentences_all, settings.premise_top_k)
+        #     verdict["llm_judge"] = _llm_judge(claim, " ".join(top))
+        #     verdict["supported"] = verdict["llm_judge"] >= settings.faithfulness_threshold
 
+        # Citation accuracy: verify the claim against its CITED chunk(s) only — a separate signal #TODO: buggy - atomize removes [n]
+        # from faithfulness (reported, NOT used to gate). None if the claim cited nothing.
+        cited_ids = cited_indices(claim)
+        # the chunks are stored indexing from 1 and len(chunks) is to prevent model from hallucinating into checking for a chunk that was not retrieved
+        cited_sources = [chunks[i - 1] for i in cited_ids if 1 <= i <= len(chunks)]
+        verdict["citation_ok"] = (
+            max((_BACKENDS[settings.verifier](claim, s["payload"]["text"]) for s in cited_sources),
+                default=0.0) >= settings.faithfulness_threshold
+            if cited_sources else None  # uncited -> None, excluded from citation metric
+        )
+        verdicts.append(verdict)
+
+    # Faithfulness layer 4 (gate): aggregate per-claim FAITHFULNESS verdicts -> supported_ratio;
+    # answer if >= min_supported_ratio, else abstain. (Citation accuracy is reported, not gated.)
     result = evaluate_answer(verdicts)
 
-    if not result["passed"]:
+    # gate_active = False is to let the system NOT abstain - computes confidence, answers everything → data for AURC
+    if settings.gate_active and not result["passed"]:
         return _abstain(
             f"Only {result['supported_ratio']:.0%} of claims were supported by the evidence",
             attempts, len(chunks), claims=verdicts,

@@ -3,6 +3,7 @@ import pickle
 
 from fastembed.rerank.cross_encoder import TextCrossEncoder
 
+from app import cache
 from app.config import settings
 from app.ingestion.embed import get_model
 from app.ingestion.index import get_client
@@ -77,7 +78,7 @@ def rerank(query: str, candidates: list[dict], top_k: int) -> list[dict]:
     return [chunk for chunk, _ in ranked[:top_k]] # return top_k ranked chunks
 
 def retrieve(query: str) -> list[dict]:
-    # Dense (Qdrant) returns ~20 and BM25 returns ~20 for the query
+    """# Dense (Qdrant) returns ~20 and BM25 returns ~20 for the query
     dense = dense_search(query, settings.retrieval_top_k)
     sparse = sparse_search(query, settings.retrieval_top_k)
     # RRF fuses them - but it's a union with overlap merged, so you get up to 40, usually fewer.
@@ -86,4 +87,31 @@ def retrieve(query: str) -> list[dict]:
     if not fused:
         return []
     # Cross-encoder reranks all fused candidates and returns the top 5
-    return rerank(query, fused, settings.rerank_top_k)
+    return rerank(query, fused, settings.rerank_top_k)"""
+
+    mode, rerank_on = settings.retrieval_mode, settings.rerank_enabled
+
+    cached = cache.get(query, mode, rerank_on)
+    if cached is not None: # found cache
+        return cached
+
+    if mode == "vector":
+        candidates = dense_search(query, settings.retrieval_top_k)
+    elif mode == "bm25":
+        candidates = sparse_search(query, settings.retrieval_top_k)
+    else: # hybrid
+        candidates = reciprocal_rank_fusion(
+            [dense_search(query, settings.retrieval_top_k),
+            sparse_search(query, settings.retrieval_top_k)]
+        )
+
+    if not candidates:
+        result = []
+    elif rerank_on:
+        result = rerank(query, candidates, settings.rerank_top_k)
+    else: # no reranking
+        result = candidates[:settings.rerank_top_k]  # take top 5 by FUSION score, no cross-encoder reordering
+
+    cache.put(query, mode, rerank_on, result)
+
+    return result

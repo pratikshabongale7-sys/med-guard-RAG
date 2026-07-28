@@ -21,6 +21,13 @@ dev = [
     "pytest>=9.1.1",
     "ruff>=0.15.20",
 ]
+eval = [
+    "datasets>=5.0.0",
+    "matplotlib>=3.11.1",
+    "pandas>=3.0.5",
+    "ragas>=0.4.3",
+    "scikit-learn>=1.9.0",
+]
 nli = [
     "protobuf>=7.35.1",
     "sentencepiece>=0.2.2",
