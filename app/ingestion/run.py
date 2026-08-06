@@ -27,6 +27,8 @@ def main() -> None:
     if not args.query and not args.from_file:
         parser.error("provide either --query or --from-file")
 
+    client = get_client(settings.qdrant_url)
+
     # step 1+2: get articles - from a file (build_goldset.py - pubmedqa_corpus.jsonl), or via live PubMed search
     if args.from_file:
         articles = load_articles_from_file(args.from_file)
@@ -35,6 +37,12 @@ def main() -> None:
         pmids = search_pubmed(query=args.query, max_results=args.max,
                               api_key=settings.ncbi_api_key, email=settings.ncbi_email)
         print(f"Found {len(pmids)} PMIDs")
+
+        # drop anything already indexed (gold docs + earlier distractors)
+        existing = {str(c["pmid"]) for c in fetch_all_chunks(client, settings.qdrant_collection)}
+        pmids = [p for p in pmids if str(p) not in existing]
+        print(f"{len(pmids)} new PMIDs after excluding {len(existing)} already indexed")
+
         articles = fetch_abstracts(pmids=pmids, api_key=settings.ncbi_api_key,
                                    email=settings.ncbi_email)
 
@@ -53,7 +61,6 @@ def main() -> None:
     print(f"Embedded {len(dense_vectors)} chunks (dim={len(dense_vectors[0])})")
 
     # step 6
-    client = get_client(settings.qdrant_url)
     ensure_collection_exists(client=client, collection=settings.qdrant_collection, vector_size=len(dense_vectors[0]))
     n = index_chunks(client=client, collection=settings.qdrant_collection, chunks=chunks, vectors=dense_vectors)
     print(f"Indexed {n} chunks/vectors into Qdrant collection '{settings.qdrant_collection}'")

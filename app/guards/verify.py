@@ -23,9 +23,10 @@ JUDGE_SYSTEM = (
 
 # return float values to match with NLI outputs
 def _llm_judge(claim: str, evidence: str) -> float:
+    claim_for_llm = re.sub(r"\[\d+\]", "", claim)
     message = [
         {"role": "system", "content": JUDGE_SYSTEM},
-        {"role": "user", "content": f"Evidence:\n{evidence}\n\nClaim:\n{claim}\n\nSupported?"},
+        {"role": "user", "content": f"Evidence:\n{evidence}\n\nClaim:\n{claim_for_llm}\n\nSupported?"},
     ]
     text, _ = generate(message)
     print("LLM Judge LLM call")
@@ -54,12 +55,12 @@ def _load_nli():
 
 
 def _nli_judge(claim: str, evidence: str) -> float:
-    # claim_for_nli = re.sub(r"\[\d+\]", "", claim)
+    claim_for_nli = re.sub(r"\[\d+\]", "", claim)
     from transformers import PreTrainedTokenizerBase
     tok: PreTrainedTokenizerBase
     tok, model, entail_idx, torch = _load_nli()
     # NLI convention: premise = the evidence, hypothesis = the claim
-    inputs = tok(evidence, claim, return_tensors="pt", truncation=True, max_lentgh=512)
+    inputs = tok(evidence, claim_for_nli, return_tensors="pt", truncation=True, max_length=512)
     with torch.inference_mode():
         logits = model(**inputs).logits
     probabilities = torch.softmax(logits, dim=-1)[0]

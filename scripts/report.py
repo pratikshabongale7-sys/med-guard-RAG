@@ -4,7 +4,7 @@ Reads eval/checkpoints/*.jsonl (from scripts.eval), flattens each nested record 
 shape metrics.py expects, and prints per-config metrics plus the headline comparisons:
   - gate ON vs OFF (hallucination + coverage + abstention)
   - verifier ablation: pure NLI vs pure LLM-judge vs two-tier
-  - retrieval ablation (from eval/retrieval_ablation.json, if present)
+  - retrieval ablation (from eval/retrieval_ablation_old.json, if present)
   - risk-coverage / AURC (from an rc_measure run, if present)
 
 Usage:
@@ -114,7 +114,7 @@ def main() -> None:
         line("coverage OFF", m_off["coverage"])
 
     # ---- verifier ablation: pure NLI vs pure LLM vs two-tier ----
-    nli, llm = CKPT_DIR / "verify_nli.jsonl", CKPT_DIR / "verify_llm.jsonl"
+    nli, llm = CKPT_DIR / "verify_mednli.jsonl", CKPT_DIR / "verify_llm.jsonl"
     if nli.exists():
         print("\n" + "=" * 60)
         print("VERIFIER ABLATION — hallucination rate")
@@ -138,7 +138,7 @@ def main() -> None:
             line(cfg, m)
 
     # ---- risk-coverage / AURC (from an rc_measure run) ----
-    rc = CKPT_DIR / "rc_measure.jsonl"
+    rc = CKPT_DIR / "rc_measure_mednli.jsonl"
     if rc.exists():
         recs = [flatten(r) for r in load_records(rc) if not r["result"].get("error")]
         curve = metrics.risk_coverage_curve(recs)

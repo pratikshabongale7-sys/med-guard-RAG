@@ -9,7 +9,9 @@ _DIR = Path(settings.eval_dir) / "cache" / "retrieval"
 
 
 def _key(query: str, mode: str, rerank: bool) -> str:
-    raw = f"{query}|{mode}|{rerank}|{settings.qdrant_collection}|{current()}"
+    raw = (f"{query}|{mode}|{rerank}"
+           f"|{settings.retrieval_top_k}|{settings.rerank_top_k}"
+           f"|{settings.qdrant_collection}|{current()}")
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 

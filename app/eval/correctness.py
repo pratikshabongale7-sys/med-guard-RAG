@@ -6,6 +6,7 @@ from pathlib import Path
 
 _DIR = Path("eval/cache/correctness")
 
+#todo: make this stricter
 DECISION_SYSTEM = (
     "Read the ANSWER and decide if it concludes yes, no, or maybe about the QUESTION. "
     "Reply with EXACTLY one word: yes, no, or maybe."

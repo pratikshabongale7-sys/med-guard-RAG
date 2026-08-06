@@ -26,9 +26,11 @@ from app.ingestion.fetch import fetch_abstracts
 # Synonyms per topic raise recall of the slice, since the keyword filter is literal
 # (e.g. catch questions that say "high blood pressure" rather than "hypertension").
 TOPICS = {
-    "hypertension": ["hypertension", "blood pressure", "antihypertensive"],
+    "surgery": ["surgery", "surgical", "operative", "postoperative"],
+    "cancer":  ["cancer", "malignan", "oncolog"],
     "diabetes": ["diabetes", "diabetic", "glycemic", "insulin"],
-    "asthma": ["asthma", "bronchodilator", "inhaled corticosteroid"],
+    "hypertension": ["hypertension", "blood pressure", "antihypertensive"],
+    "pregnancy": ["pregnancy", "pregnant", "gestational", "prenatal", "maternal", "obstetric"],
 }
 
 OUT_DIR = Path(settings.eval_dir)
@@ -39,17 +41,14 @@ def matches(text: str, terms: list[str]) -> bool:
     return any(term in t for term in terms)
 
 
-def pick_from_pubmedqa(topics: list[str], per_topic: int) -> list[dict]:
-    """Select PubMedQA items whose question or context matches a topic's terms."""
+def pick_from_pubmedqa(topics: list[str], per_topic: dict[str, int]) -> list[dict]:
     dataset = load_dataset("qiaojin/PubMedQA", "pqa_labeled", split="train")
-
-    picked: list[dict] = []
-    seen: set[str] = set()  # avoid duplicates - same pmid landing under two topics
+    picked, seen = [], set()
     for topic in topics:
         terms = TOPICS[topic]
         count = 0
         for data in dataset:
-            if count >= per_topic:
+            if count >= per_topic[topic]:      # <-- was: per_topic (int)
                 break
             pmid = str(data["pubid"])
             if pmid in seen:
@@ -64,8 +63,7 @@ def pick_from_pubmedqa(topics: list[str], per_topic: int) -> list[dict]:
                 "gold_answer": data.get("long_answer", ""),
                 "gold_decision": data.get("final_decision", ""),
             })
-            seen.add(pmid)
-            count += 1
+            seen.add(pmid); count += 1
         print(f"  {topic}: selected {count}")
     return picked
 
@@ -81,7 +79,8 @@ def main() -> None:
             raise SystemExit(f"Unknown topic '{t}'. Choose from: {', '.join(TOPICS)}")
 
     print(f"Selecting from PubMedQA for topics: {args.topics}")
-    picked = pick_from_pubmedqa(args.topics, args.per_topic)
+    PER_TOPIC = {"pregnancy": 50, "surgery": 100, "cancer": 100, "diabetes": 50, "hypertension": 50}
+    picked = pick_from_pubmedqa(args.topics, PER_TOPIC)
     pmids = [p["pmid"] for p in picked]
     print(f"Selected {len(pmids)} questions; fetching real records from NCBI...")
 
@@ -108,8 +107,8 @@ def main() -> None:
         })
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    corpus_path = OUT_DIR / "pubmedqa_corpus.jsonl"   # fed to ingestion
-    gold_path = OUT_DIR / "goldset_pubmedqa.jsonl"    # fed to the eval harness
+    corpus_path = OUT_DIR / "large_pubmedqa_corpus.jsonl"   # fed to ingestion
+    gold_path = OUT_DIR / "large_goldset_pubmedqa.jsonl"    # fed to the eval harness
     with open(corpus_path, "w") as f:
         for c in corpus:
             f.write(json.dumps(c) + "\n")

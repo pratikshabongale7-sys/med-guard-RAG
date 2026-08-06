@@ -49,7 +49,7 @@ def score(gold: list[dict], ks=(1, 3, 5)) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Retrieval-only ablations (no LLM)")
-    ap.add_argument("--gold", default="eval/goldset_small.jsonl")
+    ap.add_argument("--gold", default="eval/large_goldset_pubmedqa.jsonl")
     args = ap.parse_args()
 
     gold = load_answerable(args.gold)

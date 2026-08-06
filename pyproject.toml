@@ -35,6 +35,9 @@ nli = [
     "transformers>=5.14.1",
 ]
 
+[tool.uv]
+default-groups = ["nli"]
+
 [tool.ruff.lint]
 ignore = ["E501"]  # line length
 

@@ -46,9 +46,10 @@ class Settings(BaseSettings):
 
     # --- Faithfulness verification ---
     verifier: str = ""  # llm_judge | nli_judge
-    nli_model: str = "cross-encoder/nli-deberta-v3-small"
+    # nli_model: str = "cross-encoder/nli-deberta-v3-small"
+    nli_model: str = "pritamdeka/PubMedBERT-MNLI-MedNLI"
     atomize_claims: bool = True
-    premise_top_k: int = 3  # evidence sentences pulled per claim
+    premise_top_k: int = 5  # evidence sentences pulled per claim
     faithfulness_threshold: float = 0.5  # per-claim: entailment score to count as supported
     min_supported_ratio: float = 0.75  # answer only if >=75% of claims are supported
 
