@@ -5,9 +5,10 @@ from app.config import settings
 from app.rag import answer_query
 
 from azure.monitor.opentelemetry import configure_azure_monitor
-configure_azure_monitor()          # reads APPLICATIONINSIGHTS_CONNECTION_STRING from env
 
-app = FastAPI(title=settings.app_name, version=settings.app_version)
+configure_azure_monitor(enable_live_metrics=True)   # enable live metrics; reads the env var
+
+app = FastAPI(title=settings.app_name, version=settings.app_version)   # must come AFTER configure
 
 class AskRequest(BaseModel):
     query: str
