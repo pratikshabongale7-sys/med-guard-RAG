@@ -5,8 +5,10 @@ from app.config import settings
 from app.rag import answer_query
 
 from azure.monitor.opentelemetry import configure_azure_monitor
-
-configure_azure_monitor(enable_live_metrics=True)   # enable live metrics; reads the env var
+import os
+cs = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "")
+print(f"[appinsights] cs_len={len(cs)} has_ingest={'IngestionEndpoint' in cs} has_live={'LiveEndpoint' in cs}")
+configure_azure_monitor(enable_live_metrics=True)
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)   # must come AFTER configure
 
