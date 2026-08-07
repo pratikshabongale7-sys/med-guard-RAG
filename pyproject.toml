@@ -10,6 +10,7 @@ dependencies = [
     "httpx2>=2.5.0",
     "langchain-text-splitters>=1.1.2",
     "openai>=2.45.0",
+    "opentelemetry-instrumentation-fastapi>=0.64b0",
     "pydantic-settings>=2.14.2",
     "qdrant-client>=1.18.0",
     "rank-bm25>=0.2.2",
