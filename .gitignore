@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 .env
+.env.*
+!.env.example
 .idea
 .pytest_cache/
 .ruff_cache/
