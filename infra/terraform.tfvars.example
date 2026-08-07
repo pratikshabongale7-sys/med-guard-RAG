@@ -1,0 +1,5 @@
+subscription_id = "you-sub-id"
+image_tag       = "your-commit-sha"
+qdrant_url      = "https://your-cluster.eu-central-1-0.aws.cloud.qdrant.io:6333"
+groq_api_key    = "your_groq_key"
+qdrant_api_key  = "your_qdrant_key"
