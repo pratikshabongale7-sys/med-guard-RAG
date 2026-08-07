@@ -10,4 +10,3 @@ __pycache__/
 mlruns/
 *.db
 mlflow.db
-data/
