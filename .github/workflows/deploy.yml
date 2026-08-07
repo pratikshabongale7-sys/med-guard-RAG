@@ -1,0 +1,29 @@
+name: Build and deploy MedGuard
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest          # native amd64 → fast build, no Mac emulation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: ACR login
+        run: az acr login --name medguardacr
+
+      - name: Build & push image
+        run: |
+          docker build -t medguardacr.azurecr.io/medguard-api:${{ github.sha }} .
+          docker push medguardacr.azurecr.io/medguard-api:${{ github.sha }}
+
+      - name: Deploy to Container Apps
+        run: |
+          az containerapp update -n medguard-api -g medguard-rg \
+            --image medguardacr.azurecr.io/medguard-api:${{ github.sha }}
