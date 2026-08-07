@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     # --- Qdrant ---
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "medguard"
+    qdrant_api_key: str = ""
 
     # --- BM25 ---
     bm25_path: str = "data/bm25.pkl"

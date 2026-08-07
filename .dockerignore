@@ -1,9 +1,28 @@
+# Keep the image lean — exclude everything the serving app doesn't need at runtime.
 .venv/
-__pycache__/
-*.pyc
-.env
-.idea/
 .git/
+.github/
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# Eval/research artifacts — not needed to serve /ask
+eval/
+scripts/
 tests/
-.pytest_cache/
-.ruff_cache/
+*.md
+FINDINGS.md
+RESULTS_SUMMARY.md
+
+# Local secrets & env — inject via container env/secrets instead
+.env
+.env.*
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+
+# Model/HF caches (downloaded fresh in-container)
+.cache/

@@ -1,27 +1,34 @@
-FROM python:3.11-slim
-# above installs python image
+# MedGuard API — container image for the FastAPI serving layer (app/main.py)
+# Base: slim Python 3.11 (matches requires-python >=3.11). uv for fast, locked installs.
+FROM python:3.11-slim AS base
 
-# uv for fast, reproducible installs
+# uv binary (fast dependency install, uses your uv.lock)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# switch to app dir
+# System libs some ML wheels expect at runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
-# Install deps first (better layer caching) - copies pyproject and uv into app dir
+# --- dependency layer (cached unless pyproject/uv.lock change) ---
+# Install core deps + the `nli` group (torch/transformers) so the NLI verifier works.
+# For a much lighter image, drop `--group nli` and run with VERIFIER=llm_judge instead.
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 COPY pyproject.toml uv.lock ./
-# installs exactly what is in pyproject with the frozen flag without dev deps
-RUN uv sync --frozen --no-dev
+RUN uv sync --frozen --no-dev --group nli --no-install-project
 
-# copies app code after the above 2 commands because app code changes often and not deps - rebuilds are faster with cached deps
-COPY app ./app
+# --- application layer ---
+COPY app/ ./app/
+COPY data/ ./data/
 
-# Non-root user (HF Spaces requirement) - not a root (0-999) user
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Put the venv on PATH so `uvicorn` resolves
+ENV PATH="/app/.venv/bin:$PATH"
 
-# once all commands requiring root permissions are executed - switch to app user 1000 id - protects the app from attackers
-USER appuser
+# HF/torch caches: writable, so runtime model downloads are cached across requests
+ENV HF_HOME=/app/.cache/huggingface
+RUN mkdir -p /app/.cache/huggingface
 
-# HF requires the app running on this port
-EXPOSE 7860
-# start the server where the container runs
-CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860"]
+EXPOSE 8000
+# Container Apps/K8s send SIGTERM; uvicorn handles graceful shutdown.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
